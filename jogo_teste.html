@@ -9,7 +9,7 @@
 class GameScene extends Phaser.Scene {
     preload() {
         // Fundo
-        this.load.image('background', 'assets/IARA.png');
+        this.load.image('background', 'assets/fundo.png');
         // --- CARREGAMENTO DE ASSETS ---
         this.load.image('arrow_left', 'assets/green_arrow.png'); 
         this.load.image('arrow_down', 'assets/pink_arrow.png');
@@ -18,11 +18,15 @@ class GameScene extends Phaser.Scene {
     }
 
     create() {
-         // IMAGEM DE FUNDO
-        this.add.image(960, 540, 'background')
-            .setDisplaySize(1920, 1080);
+        // --- CONFIGURAÇÃO DE ÁUDIO DO LOCALSTORAGE ---
+        let somVolume = parseFloat(localStorage.getItem('fnf_volume')) ?? 1;
+        let somMute = localStorage.getItem('fnf_mute') === "true";
+        this.sound.volume = somVolume;
+        this.sound.mute = somMute;
 
-        this.score = 0;
+        // IMAGEM DE FUNDO
+        this.add.image(960, 540, 'background').setDisplaySize(1920, 1080);
+
         this.score = 0;
         this.health = 0.5;
         this.isGameOver = false;
@@ -38,26 +42,58 @@ class GameScene extends Phaser.Scene {
             ghost.setScale(1.3);
             
             // Rotação de setas
-        if(index === 0) ghost.setAngle(180); // Esquerda
-        if(index === 1) ghost.setAngle(90);  // Baixo
-        if(index === 2) ghost.setAngle(-90); // Cima
-        if(index === 3) ghost.setAngle(0);   // Direita
+            if(index === 0) ghost.setAngle(180); // Esquerda
+            if(index === 1) ghost.setAngle(90);  // Baixo
+            if(index === 2) ghost.setAngle(-90); // Cima
+            if(index === 3) ghost.setAngle(0);   // Direita
         });
 
         this.setupHealthBar();
 
+        // --- CARREGAR CONTROLES CUSTOMIZADOS DO LOCALSTORAGE ---
+        this.customControls = JSON.parse(localStorage.getItem('fnf_controls')) || {
+            left: { key: "ARROWLEFT", code: "LEFT" },
+            down: { key: "ARROWDOWN", code: "DOWN" },
+            up: { key: "ARROWUP", code: "UP" },
+            right: { key: "ARROWRIGHT", code: "RIGHT" }
+        };
+
+        // Injeta as teclas escolhidas na configuração de Inputs do Phaser
         this.keys = this.input.keyboard.addKeys({ 
-            left: "LEFT", down: "DOWN", up: "UP", right: "RIGHT" 
+            left: this.customControls.left.code, 
+            down: this.customControls.down.code, 
+            up: this.customControls.up.code, 
+            right: this.customControls.right.code 
         });
 
+        // Evento geral ao clicar em qualquer tecla do teclado
         this.input.keyboard.on('keydown', (event) => {
             if (this.isGameOver) return;
-            const keyNames = ["ARROWLEFT", "ARROWDOWN", "ARROWUP", "ARROWRIGHT", "LEFT", "DOWN", "UP", "RIGHT"];
-            if (keyNames.includes(event.key.toUpperCase())) {
+            
+            const teclaPressionada = event.key.toUpperCase();
+            
+            // Lista das teclas que o utilizador configurou no menu
+            const teclasValivas = [
+                this.customControls.left.key,
+                this.customControls.down.key,
+                this.customControls.up.key,
+                this.customControls.right.key
+            ];
+
+            // Executa se a tecla pressionada for uma das 4 configuradas
+            if (teclasValivas.includes(teclaPressionada)) {
                 let hitSuccess = false;
+                
                 this.notes.getChildren().forEach(note => {
-                    if (Math.abs(note.y - this.hitY) < 70) hitSuccess = true;
+                    let laneDaTecla = teclasValivas.indexOf(teclaPressionada);
+                    
+                    // Verifica se a nota que está próxima pertence à mesma pista da tecla que foi clicada
+                    if (note.lane === laneDaTecla && Math.abs(note.y - this.hitY) < 70) {
+                        hitSuccess = true;
+                    }
                 });
+
+                // Se o utilizador bater numa tecla válida mas errar o tempo ou a pista da nota
                 if (!hitSuccess) {
                     this.health -= 0.05;
                     this.cameras.main.shake(100, 0.005);
@@ -80,27 +116,27 @@ class GameScene extends Phaser.Scene {
     }
 
    setupEndMenu() {
-    this.uiGroup = this.add.group();
-    this.menuBg = this.add.rectangle(960, 540, 1920, 1080, 0x000000, 0.8).setDepth(100);
-    this.menuTitle = this.add.text(960, 400, "", { fontSize: "100px", fontWeight: "bold" }).setOrigin(0.5).setDepth(101);
-    
-    this.btnRetry = this.add.text(960, 580, "TENTAR DE NOVO", { 
-        fontSize: "40px", backgroundColor: "#00ff00", color: "#000", padding: { x: 20, y: 10 } 
-    }).setOrigin(0.5).setDepth(101).setInteractive({ useHandCursor: true });
+        this.uiGroup = this.add.group();
+        this.menuBg = this.add.rectangle(960, 540, 1920, 1080, 0x000000, 0.8).setDepth(100);
+        this.menuTitle = this.add.text(960, 400, "", { fontSize: "100px", fontWeight: "bold" }).setOrigin(0.5).setDepth(101);
+        
+        this.btnRetry = this.add.text(960, 580, "TENTAR DE NOVO", { 
+            fontSize: "40px", backgroundColor: "#00ff00", color: "#000", padding: { x: 20, y: 10 } 
+        }).setOrigin(0.5).setDepth(101).setInteractive({ useHandCursor: true });
 
-    this.btnQuit = this.add.text(960, 680, "SAIR PARA O MENU", { 
-        fontSize: "30px", color: "#ff0000" 
-    }).setOrigin(0.5).setDepth(101).setInteractive({ useHandCursor: true });
+        this.btnQuit = this.add.text(960, 680, "SAIR PARA O MENU", { 
+            fontSize: "30px", color: "#ff0000" 
+        }).setOrigin(0.5).setDepth(101).setInteractive({ useHandCursor: true });
 
-    this.btnRetry.on('pointerdown', () => this.scene.restart());
-    
-    this.btnQuit.on('pointerdown', () => {
-        window.location.href = "menu.html";
-    });
+        this.btnRetry.on('pointerdown', () => this.scene.restart());
+        
+        this.btnQuit.on('pointerdown', () => {
+            window.location.href = "menu.html";
+        });
 
-    this.uiGroup.addMultiple([this.menuBg, this.menuTitle, this.btnRetry, this.btnQuit]);
-    this.uiGroup.setVisible(false);
-}
+        this.uiGroup.addMultiple([this.menuBg, this.menuTitle, this.btnRetry, this.btnQuit]);
+        this.uiGroup.setVisible(false);
+    }
 
     spawnNote() {
         if (this.isGameOver) return;
@@ -128,14 +164,12 @@ class GameScene extends Phaser.Scene {
 
             if (note.y > this.hitY + 80) {
                 this.health -= 0.08;
-                //setar frame triste
                 note.destroy();
             }
 
             if (this.checkHit(note)) {
                 this.health += 0.04;
                 this.score += 100;
-                // setar frame feliz
                 this.scoreText.setText("Score: " + this.score);
                 note.destroy();
             }

@@ -167,7 +167,28 @@
             z-index: 10;
         }
 
-        input { margin-bottom: 10px; padding: 5px; border-radius: 4px; border: none; }
+        /* --- Novos estilos adicionados para a aba de Opções --- */
+        .config-row { 
+            margin: 15px 0; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 0 20px; 
+        }
+        .key-btn { 
+            background: #17AC90; 
+            border: none; 
+            color: white; 
+            padding: 5px 10px; 
+            cursor: pointer; 
+            border-radius: 4px; 
+            min-width: 100px; 
+            font-family: 'Offside', sans-serif;
+            font-size: 0.85em;
+            transition: background 0.2s;
+        }
+        .key-btn:hover { background: #1bc4a4; }
+        .key-btn.waiting { background: #ecbb15; color: black; }
     </style>
 </head>
 <body>
@@ -186,26 +207,36 @@
         </ul>
     </nav>
 
-    <section id="login">
-        <header>
-            Login
-            <div class="close"></div>
-        </header>
-        <div>
-            <p>Digite o seu nome de usuário e senha:</p>
-            <input type="text" name="nick" id="nick" placeholder="Nick"/><br/>
-            <input type="password" name="senha" id="senha" placeholder="Senha"/><br/>
-            <p>Ou registre-se <a href="">aqui</a></p>
-        </div>
-    </section>
-
     <section id="opcoes">
         <header>
             Opções
             <div class="close"></div>
         </header>
         <div>
-            <p>Configurações de som, vídeo e jogabilidade.</p>
+            <div class="config-row">
+                <label for="volume-slider">Volume Geral:</label>
+                <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="1">
+            </div>
+            <div class="config-row">
+                <label for="mute-checkbox">Desativar Música (Mute):</label>
+                <input type="checkbox" id="mute-checkbox">
+            </div>
+            
+            <hr style="border-color: #444; margin: 15px 10px;">
+            <p style="font-size: 0.85em; color: #ecbb15;">Clique no botão e pressione a nova tecla:</p>
+            
+            <div class="config-row">
+                <span>Esquerda:</span> <button class="key-btn" id="key-left" data-lane="left">ARROWLEFT</button>
+            </div>
+            <div class="config-row">
+                <span>Baixo:</span> <button class="key-btn" id="key-down" data-lane="down">ARROWDOWN</button>
+            </div>
+            <div class="config-row">
+                <span>Cima:</span> <button class="key-btn" id="key-up" data-lane="up">ARROWUP</button>
+            </div>
+            <div class="config-row">
+                <span>Direita:</span> <button class="key-btn" id="key-right" data-lane="right">ARROWRIGHT</button>
+            </div>
         </div>
     </section>
 
@@ -221,19 +252,77 @@
 
     <script>
         $(document).ready(function(){
-            $("#jogar-btn").click(function(event){
-                $("#login").addClass("active");
+            // Carregar configurações salvas ou definir os padrões iniciais (Caso seja a primeira execução)
+            let controls = JSON.parse(localStorage.getItem('fnf_controls')) || {
+                left: { key: "ARROWLEFT", code: "LEFT" },
+                down: { key: "ARROWDOWN", code: "DOWN" },
+                up: { key: "ARROWUP", code: "UP" },
+                right: { key: "ARROWRIGHT", code: "RIGHT" }
+            };
+            let volume = localStorage.getItem('fnf_volume') || "1";
+            let mute = localStorage.getItem('fnf_mute') === "true";
+
+            // Aplicar os valores carregados na interface visual do Menu
+            $("#volume-slider").val(volume);
+            $("#mute-checkbox").prop('checked', mute);
+            $("#key-left").text(controls.left.key);
+            $("#key-down").text(controls.down.key);
+            $("#key-up").text(controls.up.key);
+            $("#key-right").text(controls.right.key);
+
+            // Ouvintes para salvar alterações de Volume/Mute instantaneamente
+            $("#volume-slider").on('input', function() {
+                localStorage.setItem('fnf_volume', $(this).val());
+            });
+            $("#mute-checkbox").on('change', function() {
+                localStorage.setItem('fnf_mute', $(this).is(':checked'));
             });
 
+            // Lógica para detectar e remapear as teclas
+            let laneAguardando = null;
+
+            $(".key-btn").click(function() {
+                $(".key-btn").removeClass("waiting");
+                $(this).addClass("waiting").text("Aperte algo...");
+                laneAguardando = $(this).data("lane");
+            });
+
+            $(document).keydown(function(e) {
+                if (laneAguardando) {
+                    let nomeTecla = e.key.toUpperCase();
+                    let codigoPhaser = nomeTecla;
+
+                    // Ajusta mapeamento das setas para corresponder ao padrão addKeys do Phaser
+                    if(e.keyCode === 37) codigoPhaser = "LEFT";
+                    if(e.keyCode === 38) code = "UP";
+                    if(e.keyCode === 38) codigoPhaser = "UP";
+                    if(e.keyCode === 39) codigoPhaser = "RIGHT";
+                    if(e.keyCode === 40) codigoPhaser = "DOWN";
+                    if(e.keyCode === 32) { nomeTecla = "ESPAÇO"; codigoPhaser = "SPACE"; }
+
+                    // Atualiza o objeto local e salva no localStorage
+                    controls[laneAguardando] = { key: nomeTecla, code: codigoPhaser };
+                    localStorage.setItem('fnf_controls', JSON.stringify(controls));
+
+                    // Atualiza o texto do botão modificado
+                    $("#key-" + laneAguardando).removeClass("waiting").text(nomeTecla);
+                    laneAguardando = null;
+                }
+            });
+
+            // Gerenciamento das Janelas do Menu
             $("#op-btn").click(function(event){
+                event.preventDefault();
                 $("#opcoes").addClass("active");
             });
 
-            $("#midia-btn").click(function(){
+            $("#midia-btn").click(function(event){
+                event.preventDefault();
                 $("#midia").addClass("active");
             });
 
             $(".close").click(function() {
+                laneAguardando = null; // Cancela se fechar no meio do mapeamento
                 $(this).closest("section").removeClass("active");
             });
         });
