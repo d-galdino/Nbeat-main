@@ -18,7 +18,7 @@ class GameScene extends Phaser.Scene {
     }
 
     create() {
-        // --- CONFIGURAÇÃO DE ÁUDIO SEGURA CONTRA NaN ---
+        // --- CONFIGURAÇÃO DE ÁUDIO ---
         let somSalvo = localStorage.getItem('fnf_volume');
         // Se não existir nada salvo ou se o valor não for um número válido, usa 1
         let somVolume = (somSalvo !== null && !isNaN(parseFloat(somSalvo))) ? parseFloat(somSalvo) : 1;
